@@ -9,9 +9,7 @@ import { PrismaClient } from '@prisma/client'
  *                             prisma.config.ts; not needed by the client here.
  */
 const prismaClientSingleton = () => {
-  return new PrismaClient({
-    datasourceUrl: process.env.POSTGRES_PRISMA_URL,
-  })
+  return new PrismaClient()
 }
 
 declare const globalThis: {
