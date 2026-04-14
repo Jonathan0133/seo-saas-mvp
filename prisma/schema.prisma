@@ -1,0 +1,650 @@
+datasource db {
+  provider = "postgresql"
+}
+
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+enum Role {
+  owner
+  editor
+  viewer
+}
+
+enum ProjectStatus {
+  active
+  archived
+}
+
+enum KeywordType {
+  seed
+  discovered
+  manual
+}
+
+enum Intent {
+  informational
+  commercial
+  transactional
+  navigational
+  mixed
+}
+
+enum KeywordStatus {
+  new
+  analyzing
+  ready
+  briefed
+  published
+  ignored
+}
+
+enum SerpSnapshotStatus {
+  pending
+  completed
+  failed
+}
+
+enum ResultType {
+  article
+  category
+  forum
+  video
+  tool
+  comparison
+  product
+  other
+}
+
+enum PageType {
+  article
+  listicle
+  comparison
+  category
+  product
+  forum
+  video
+  tool
+  landing
+  other
+}
+
+enum HeadingLevel {
+  h1
+  h2
+  h3
+  h4
+}
+
+enum EntityType {
+  topic
+  brand
+  product
+  place
+  person
+  other
+}
+
+enum LinkType {
+  internal
+  external
+}
+
+enum AnchorType {
+  branded
+  exact
+  partial
+  generic
+  other
+}
+
+enum MediaType {
+  image
+  video
+  table
+  chart
+  infographic
+  download
+}
+
+enum GapReportStatus {
+  draft
+  approved
+}
+
+enum BriefStatus {
+  draft
+  approved
+  locked
+  archived
+}
+
+enum ArticleStatus {
+  draft
+  review
+  approved
+  scheduled
+  published
+  archived
+}
+
+enum IntegrationType {
+  wordpress
+  serp_provider
+  gsc
+  ga4
+  ai_provider
+}
+
+enum PublishJobStatus {
+  queued
+  running
+  published
+  failed
+}
+
+enum WorkflowJobStatus {
+  queued
+  running
+  completed
+  failed
+  cancelled
+}
+
+enum PerformanceSource {
+  gsc
+  ga4
+  manual
+}
+
+model User {
+  id            String    @id @default(uuid())
+  email         String    @unique
+  passwordHash  String?
+  fullName      String?
+  avatarUrl     String?
+  createdAt     DateTime  @default(now()) @db.Timestamptz
+  updatedAt     DateTime  @updatedAt @db.Timestamptz
+  lastLoginAt   DateTime? @db.Timestamptz
+
+  ownedWorkspaces Workspace[]
+  workspaceMembers WorkspaceMember[]
+  createdArticles Article[] @relation("ArticleCreatedBy")
+  updatedArticles Article[] @relation("ArticleUpdatedBy")
+}
+
+model Workspace {
+  id            String    @id @default(uuid())
+  name          String
+  slug          String    @unique
+  ownerUserId   String
+  createdAt     DateTime  @default(now()) @db.Timestamptz
+  updatedAt     DateTime  @updatedAt @db.Timestamptz
+
+  owner         User      @relation(fields: [ownerUserId], references: [id])
+  members       WorkspaceMember[]
+  projects      Project[]
+  auditLogs     AuditLog[]
+}
+
+model WorkspaceMember {
+  id            String    @id @default(uuid())
+  workspaceId   String
+  userId        String
+  role          Role      @default(viewer)
+  createdAt     DateTime  @default(now()) @db.Timestamptz
+
+  workspace     Workspace @relation(fields: [workspaceId], references: [id])
+  user          User      @relation(fields: [userId], references: [id])
+
+  @@unique([workspaceId, userId])
+}
+
+model Project {
+  id            String    @id @default(uuid())
+  workspaceId   String
+  name          String
+  domain        String
+  niche         String?
+  countryCode   String    @db.VarChar(2)
+  languageCode  String    @db.VarChar(8)
+  defaultDevice String    @default("desktop")
+  status        ProjectStatus @default(active)
+  settingsJson  Json      @default("{}")
+  createdAt     DateTime  @default(now()) @db.Timestamptz
+  updatedAt     DateTime  @updatedAt @db.Timestamptz
+
+  workspace     Workspace @relation(fields: [workspaceId], references: [id])
+  keywords      Keyword[]
+  serpSnapshots SerpSnapshot[]
+  competitorPages CompetitorPage[]
+  gapReports    GapReport[]
+  contentBriefs ContentBrief[]
+  articles      Article[]
+  integrations  Integration[]
+  publishJobs   PublishJob[]
+  workflowJobs  WorkflowJob[]
+  performanceSnapshots PerformanceSnapshot[]
+
+  @@unique([workspaceId, domain])
+  @@index([workspaceId])
+}
+
+model Keyword {
+  id                  String    @id @default(uuid())
+  projectId           String
+  rawKeyword          String
+  canonicalKeyword    String
+  keywordType         KeywordType
+  intent              Intent?
+  localeCountry       String    @db.VarChar(2)
+  localeLanguage      String    @db.VarChar(8)
+  trendScore          Int?
+  difficultyScore     Int?
+  serpWeaknessScore   Int?
+  businessValueScore  Int?
+  priorityScore       Int?
+  status              KeywordStatus @default(new)
+  sourceJson          Json?
+  createdAt           DateTime  @default(now()) @db.Timestamptz
+  updatedAt           DateTime  @updatedAt @db.Timestamptz
+
+  project             Project   @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  serpSnapshots       SerpSnapshot[]
+  gapReports          GapReport[]
+  contentBriefs       ContentBrief[]
+  articles            Article[]
+  performanceSnapshots PerformanceSnapshot[]
+
+  @@unique([projectId, canonicalKeyword, localeCountry, localeLanguage])
+  @@index([projectId])
+  @@index([projectId, status])
+  @@index([projectId, canonicalKeyword])
+}
+
+model SerpSnapshot {
+  id                  String    @id @default(uuid())
+  projectId           String
+  keywordId           String
+  device              String    @default("desktop")
+  countryCode         String    @db.VarChar(2)
+  languageCode        String    @db.VarChar(8)
+  searchEngine        String    @default("google")
+  fetchedAt           DateTime  @db.Timestamptz
+  topN                Int
+  serpFeaturesJson    Json?
+  rawResponseJson     Json?
+  status              SerpSnapshotStatus @default(pending)
+  createdAt           DateTime  @default(now()) @db.Timestamptz
+
+  project             Project   @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  keyword             Keyword   @relation(fields: [keywordId], references: [id], onDelete: Cascade)
+  results             SerpResult[]
+  competitorPages     CompetitorPage[]
+  gapReports          GapReport[]
+
+  @@index([keywordId, fetchedAt(sort: Desc)])
+  @@index([projectId])
+}
+
+model SerpResult {
+  id                  String    @id @default(uuid())
+  serpSnapshotId      String
+  rankPosition        Int
+  url                 String
+  domain              String
+  title               String?
+  metaDescription     String?
+  resultType          ResultType?
+  isPrimaryCompetitor Boolean   @default(true)
+  createdAt           DateTime  @default(now()) @db.Timestamptz
+
+  serpSnapshot        SerpSnapshot @relation(fields: [serpSnapshotId], references: [id], onDelete: Cascade)
+  competitorPages     CompetitorPage[]
+
+  @@unique([serpSnapshotId, rankPosition])
+  @@index([serpSnapshotId, rankPosition])
+}
+
+model CompetitorPage {
+  id                  String    @id @default(uuid())
+  projectId           String
+  serpSnapshotId      String
+  serpResultId        String
+  url                 String
+  domain              String
+  canonicalUrl        String?
+  slug                String?
+  pageType            PageType?
+  title               String?
+  titleLength         Int?
+  metaDescription     String?
+  metaLength          Int?
+  h1Text              String?
+  wordCount           Int?
+  paragraphCount      Int?
+  avgSentenceLength   Decimal?
+  bulletCount         Int?
+  tableCount          Int?
+  faqCount            Int?
+  imageCount          Int?
+  imageWithAltCount   Int?
+  videoCount          Int?
+  internalLinksCount  Int?
+  externalLinksCount  Int?
+  bodyInternalLinksCount Int?
+  publishedDate       DateTime? @db.Timestamptz
+  modifiedDate        DateTime? @db.Timestamptz
+  hasToc              Boolean?
+  hasSummaryBox       Boolean?
+  hasProsCons         Boolean?
+  hasAuthorBox        Boolean?
+  hasUpdatedNotice    Boolean?
+  keywordInTitle      Boolean?
+  keywordInH1         Boolean?
+  keywordInIntro      Boolean?
+  readabilityScore    Decimal?
+  metadataScore       Int?
+  structureScore      Int?
+  depthScore          Int?
+  mediaScore          Int?
+  linkingScore        Int?
+  freshnessScore      Int?
+  intentMatchScore    Int?
+  snippetScore        Int?
+  semanticScore       Int?
+  totalPageScore      Int?
+  rawHtmlStorageKey   String?
+  parsedJson          Json?
+  createdAt           DateTime  @default(now()) @db.Timestamptz
+  updatedAt           DateTime  @updatedAt @db.Timestamptz
+
+  project             Project   @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  serpSnapshot        SerpSnapshot @relation(fields: [serpSnapshotId], references: [id], onDelete: Cascade)
+  serpResult          SerpResult @relation(fields: [serpResultId], references: [id], onDelete: Cascade)
+  headings            CompetitorHeading[]
+  entities            CompetitorEntity[]
+  links               CompetitorLink[]
+  media               CompetitorMedia[]
+
+  @@index([serpSnapshotId])
+  @@index([projectId])
+  @@index([domain])
+}
+
+model CompetitorHeading {
+  id                  String    @id @default(uuid())
+  competitorPageId    String
+  level               HeadingLevel
+  positionIndex       Int
+  text                String
+  createdAt           DateTime  @default(now()) @db.Timestamptz
+
+  competitorPage      CompetitorPage @relation(fields: [competitorPageId], references: [id], onDelete: Cascade)
+
+  @@index([competitorPageId, level, positionIndex])
+}
+
+model CompetitorEntity {
+  id                  String    @id @default(uuid())
+  competitorPageId    String
+  entityText          String
+  normalizedEntity    String
+  entityType          EntityType @default(topic)
+  frequency           Int       @default(1)
+  prominenceScore     Decimal?
+  createdAt           DateTime  @default(now()) @db.Timestamptz
+
+  competitorPage      CompetitorPage @relation(fields: [competitorPageId], references: [id], onDelete: Cascade)
+
+  @@index([competitorPageId])
+  @@index([normalizedEntity])
+}
+
+model CompetitorLink {
+  id                  String    @id @default(uuid())
+  competitorPageId    String
+  linkType            LinkType
+  anchorText          String?
+  href                String
+  isBodyLink          Boolean   @default(true)
+  anchorType          AnchorType?
+  createdAt           DateTime  @default(now()) @db.Timestamptz
+
+  competitorPage      CompetitorPage @relation(fields: [competitorPageId], references: [id], onDelete: Cascade)
+
+  @@index([competitorPageId, linkType])
+}
+
+model CompetitorMedia {
+  id                  String    @id @default(uuid())
+  competitorPageId    String
+  mediaType           MediaType
+  src                 String?
+  altText             String?
+  positionIndex       Int?
+  createdAt           DateTime  @default(now()) @db.Timestamptz
+
+  competitorPage      CompetitorPage @relation(fields: [competitorPageId], references: [id], onDelete: Cascade)
+
+  @@index([competitorPageId, mediaType])
+}
+
+model GapReport {
+  id                  String    @id @default(uuid())
+  projectId           String
+  keywordId           String
+  serpSnapshotId      String
+  summaryText         String?
+  tableStakesJson     Json      @default("{}")
+  gapTopicsJson       Json      @default("{}")
+  formatGapsJson      Json?
+  freshnessGapsJson   Json?
+  clarityGapsJson     Json?
+  recommendedWordCountMin Int?
+  recommendedWordCountMax Int?
+  recommendedImageCount Int?
+  recommendedInternalLinksMin Int?
+  recommendedExternalLinksMin Int?
+  status              GapReportStatus @default(draft)
+  createdAt           DateTime  @default(now()) @db.Timestamptz
+  updatedAt           DateTime  @updatedAt @db.Timestamptz
+
+  project             Project   @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  keyword             Keyword   @relation(fields: [keywordId], references: [id], onDelete: Cascade)
+  serpSnapshot        SerpSnapshot @relation(fields: [serpSnapshotId], references: [id], onDelete: Cascade)
+  contentBriefs       ContentBrief[]
+
+  @@index([keywordId])
+  @@index([projectId])
+}
+
+model ContentBrief {
+  id                  String    @id @default(uuid())
+  projectId           String
+  keywordId           String
+  gapReportId         String?
+  version             Int       @default(1)
+  titleAngle          String?
+  metaAngle           String?
+  targetPageType      String?
+  targetWordCountMin  Int?
+  targetWordCountMax  Int?
+  targetImageCount    Int?
+  targetInternalLinksMin Int?
+  targetExternalLinksMin Int?
+  requiredHeadingsJson Json     @default("{}")
+  faqTargetsJson      Json?
+  requiredEntitiesJson Json?
+  snippetTargetText   String?
+  schemaType          String?
+  risksJson           Json?
+  status              BriefStatus @default(draft)
+  createdAt           DateTime  @default(now()) @db.Timestamptz
+  updatedAt           DateTime  @updatedAt @db.Timestamptz
+
+  project             Project   @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  keyword             Keyword   @relation(fields: [keywordId], references: [id], onDelete: Cascade)
+  gapReport           GapReport? @relation(fields: [gapReportId], references: [id], onDelete: Cascade)
+  articles            Article[]
+
+  @@unique([keywordId, version])
+  @@index([projectId])
+  @@index([keywordId])
+}
+
+model Article {
+  id                  String    @id @default(uuid())
+  projectId           String
+  keywordId           String?
+  contentBriefId      String?
+  version             Int       @default(1)
+  title               String?
+  slug                String?
+  metaDescription     String?
+  h1Text              String?
+  contentMarkdown     String?
+  contentHtml         String?
+  wordCount           Int?
+  status              ArticleStatus @default(draft)
+  editorNotes         String?
+  createdByUserId     String?
+  updatedByUserId     String?
+  createdAt           DateTime  @default(now()) @db.Timestamptz
+  updatedAt           DateTime  @updatedAt @db.Timestamptz
+  publishedAt         DateTime? @db.Timestamptz
+
+  project             Project   @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  keyword             Keyword?  @relation(fields: [keywordId], references: [id], onDelete: Cascade)
+  contentBrief        ContentBrief? @relation(fields: [contentBriefId], references: [id], onDelete: Cascade)
+  createdByUser       User?     @relation("ArticleCreatedBy", fields: [createdByUserId], references: [id])
+  updatedByUser       User?     @relation("ArticleUpdatedBy", fields: [updatedByUserId], references: [id])
+  validations         ArticleValidation[]
+  publishJobs         PublishJob[]
+  performanceSnapshots PerformanceSnapshot[]
+
+  @@index([projectId, status])
+  @@index([contentBriefId])
+}
+
+model ArticleValidation {
+  id                  String    @id @default(uuid())
+  articleId           String
+  validationVersion   Int       @default(1)
+  totalScore          Int
+  titleScore          Int?
+  metaScore           Int?
+  structureScore      Int?
+  coverageScore       Int?
+  linksScore          Int?
+  snippetScore        Int?
+  checksJson          Json      @default("{}")
+  createdAt           DateTime  @default(now()) @db.Timestamptz
+
+  article             Article   @relation(fields: [articleId], references: [id], onDelete: Cascade)
+
+  @@index([articleId, createdAt(sort: Desc)])
+}
+
+model Integration {
+  id                  String    @id @default(uuid())
+  projectId           String
+  type                IntegrationType
+  name                String
+  configJsonEncrypted String
+  isActive            Boolean   @default(true)
+  createdAt           DateTime  @default(now()) @db.Timestamptz
+  updatedAt           DateTime  @updatedAt @db.Timestamptz
+
+  project             Project   @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  publishJobs         PublishJob[]
+}
+
+model PublishJob {
+  id                  String    @id @default(uuid())
+  projectId           String
+  articleId           String
+  integrationId       String
+  provider            String    @default("wordpress")
+  status              PublishJobStatus @default(queued)
+  remotePostId        String?
+  publishedUrl        String?
+  requestJson         Json?
+  responseJson        Json?
+  errorMessage        String?
+  startedAt           DateTime? @db.Timestamptz
+  finishedAt          DateTime? @db.Timestamptz
+  createdAt           DateTime  @default(now()) @db.Timestamptz
+
+  project             Project   @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  article             Article   @relation(fields: [articleId], references: [id], onDelete: Cascade)
+  integration         Integration @relation(fields: [integrationId], references: [id], onDelete: Cascade)
+
+  @@index([articleId])
+  @@index([projectId, status])
+}
+
+model WorkflowJob {
+  id                  String    @id @default(uuid())
+  projectId           String
+  queueName           String
+  jobName             String
+  bullJobId           String?
+  relatedEntityType   String?
+  relatedEntityId     String?
+  inputJson           Json?
+  outputJson          Json?
+  progressJson        Json?
+  status              WorkflowJobStatus @default(queued)
+  errorMessage        String?
+  attempts            Int       @default(0)
+  createdAt           DateTime  @default(now()) @db.Timestamptz
+  startedAt           DateTime? @db.Timestamptz
+  finishedAt          DateTime? @db.Timestamptz
+
+  project             Project   @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@index([projectId, status])
+  @@index([queueName, jobName])
+}
+
+model PerformanceSnapshot {
+  id                  String    @id @default(uuid())
+  projectId           String
+  articleId           String?
+  keywordId           String?
+  source              PerformanceSource
+  snapshotDate        DateTime  @db.Date
+  impressions         Int?
+  clicks              Int?
+  ctr                 Decimal?
+  avgPosition         Decimal?
+  sessions            Int?
+  conversions         Int?
+  extraJson           Json?
+  createdAt           DateTime  @default(now()) @db.Timestamptz
+
+  project             Project   @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  article             Article?  @relation(fields: [articleId], references: [id], onDelete: Cascade)
+  keyword             Keyword?  @relation(fields: [keywordId], references: [id], onDelete: Cascade)
+
+  @@index([projectId, snapshotDate])
+  @@index([articleId, snapshotDate])
+}
+
+model AuditLog {
+  id                  String    @id @default(uuid())
+  workspaceId         String
+  userId              String?
+  action              String
+  entityType          String
+  entityId            String?
+  diffJson            Json?
+  createdAt           DateTime  @default(now()) @db.Timestamptz
+
+  workspace           Workspace @relation(fields: [workspaceId], references: [id])
+
+  @@index([workspaceId])
+}
