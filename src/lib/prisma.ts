@@ -1,10 +1,10 @@
 import { PrismaClient } from '@prisma/client'
 
 /**
- * Prisma v7 Stable Singleton.
+ * Prisma v7 Standard Singleton.
  * 
- * By using 'engineType = "library"' in the schema, we can return 
- * to the standard initialization which is most stable on Vercel.
+ * This follows the official recommended pattern for Next.js 
+ * and relies on Prisma's automatic environment loading.
  */
 const prismaClientSingleton = () => {
   return new PrismaClient({
