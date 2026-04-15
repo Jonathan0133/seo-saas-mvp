@@ -1,18 +1,17 @@
 import { PrismaClient } from '@prisma/client'
 
 /**
- * Prisma v7 Singleton with explicit datasource URL.
- * We use the 'datasources' object which is the standard way to provide the connection string.
+ * Prisma v7 Singleton for Prisma Postgres / Accelerate.
+ * 
+ * The "client" engine explicitly requires 'accelerateUrl' to be passed 
+ * in the constructor when using the Prisma Postgres managed service.
  */
 const prismaClientSingleton = () => {
   const url = process.env.POSTGRES_PRISMA_DATABASE_URL || process.env.POSTGRES_PRISMA_URL || process.env.DATABASE_URL;
-  
+
   return new PrismaClient({
-    datasources: {
-      db: {
-        url: url,
-      },
-    },
+    // @ts-ignore - 'accelerateUrl' is the required property for the Prisma 7 "client" engine
+    accelerateUrl: url,
   })
 }
 
