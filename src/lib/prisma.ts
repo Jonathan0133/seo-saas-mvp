@@ -1,18 +1,14 @@
 import { PrismaClient } from '@prisma/client'
 
 /**
- * Prisma v7 Singleton for Prisma Postgres / Accelerate.
+ * Prisma v7 Stable Singleton.
  * 
- * The "client" engine explicitly requires 'accelerateUrl' to be passed 
- * in the constructor when using the Prisma Postgres managed service.
+ * By using 'engineType = "library"' in the schema, we can return 
+ * to the standard initialization which is most stable on Vercel.
  */
 const prismaClientSingleton = () => {
-  const rawUrl = process.env.POSTGRES_PRISMA_DATABASE_URL || process.env.POSTGRES_PRISMA_URL || process.env.DATABASE_URL || '';
-  const url = rawUrl.replace(/^postgres(ql)?:\/\//, 'prisma+postgres://');
-
   return new PrismaClient({
-    // @ts-ignore - 'accelerateUrl' is the required property for the Prisma 7 "client" engine
-    accelerateUrl: url,
+    log: ['error', 'warn'],
   })
 }
 
