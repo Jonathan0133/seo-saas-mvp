@@ -7,7 +7,8 @@ import { PrismaClient } from '@prisma/client'
  * in the constructor when using the Prisma Postgres managed service.
  */
 const prismaClientSingleton = () => {
-  const url = process.env.POSTGRES_PRISMA_DATABASE_URL || process.env.POSTGRES_PRISMA_URL || process.env.DATABASE_URL;
+  const rawUrl = process.env.POSTGRES_PRISMA_DATABASE_URL || process.env.POSTGRES_PRISMA_URL || process.env.DATABASE_URL || '';
+  const url = rawUrl.startsWith('postgres://') ? rawUrl.replace('postgres://', 'prisma+postgres://') : rawUrl;
 
   return new PrismaClient({
     // @ts-ignore - 'accelerateUrl' is the required property for the Prisma 7 "client" engine
